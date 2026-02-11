@@ -68,7 +68,7 @@ func New(ctx context.Context, config *Config) (*Engine, error) {
 		aggregatorService = aggregator.New(ctx)
 	}
 
-	promptStore, err := prompts.NewPromptStore()
+	promptStore, err := prompts.NewPromptStore(prompts.DefaultTemplates())
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize prompt store: %w", err)
 	}
