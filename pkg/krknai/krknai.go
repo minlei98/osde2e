@@ -350,14 +350,27 @@ func (k *KrknAI) Cleanup(ctx context.Context) error {
 }
 
 // PostProcessCluster performs optional post-processing on the cluster
-// after test execution but before cleanup.
+// after test execution but before cleanup, including must-gather when not skipped.
+// Must-gather runs locally via oc (no Ginkgo helper); aborts after 30 minutes.
 func (k *KrknAI) PostProcessCluster(ctx context.Context) error {
-	// TODO: Implement post-processing logic
-	// This could include:
-	// - Collecting chaos experiment artifacts
-	// - Updating cluster metadata
-	// - Extending cluster expiration if needed
+	if viper.GetBool(config.DryRun) {
+		return nil
+	}
+	if viper.GetBool(config.SkipMustGather) {
+		return nil
+	}
 
+	kubeconfigPath := filepath.Join(viper.GetString(config.SharedDir), kubeconfigFileName)
+	reportDir := viper.GetString(config.ReportDir)
+	if reportDir == "" {
+		reportDir = "/tmp/report-dir"
+	}
+	destDir := filepath.Join(reportDir, "must-gather")
+
+	if err := cluster.RunMustGatherToDir(ctx, kubeconfigPath, destDir); err != nil {
+		k.result.Errors = append(k.result.Errors, err)
+		return fmt.Errorf("must-gather failed: %w", err)
+	}
 	return nil
 }
 

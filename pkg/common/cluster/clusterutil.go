@@ -8,6 +8,7 @@ import (
 	"log"
 	"math/rand"
 	"os"
+	"os/exec"
 	"strings"
 	"time"
 
@@ -866,6 +867,32 @@ func RunMustGather(ctx context.Context, h *helper.H) error {
 	}
 
 	h.WriteResults(results)
+	return nil
+}
+
+const mustGatherTimeout = 30 * time.Minute
+
+// RunMustGatherToDir runs must-gather locally via oc and writes output to destDir.
+// Aborts after 30 minutes. Does not use the Ginkgo helper (for use from krkn-ai CLI).
+func RunMustGatherToDir(ctx context.Context, kubeconfigPath, destDir string) error {
+	if err := os.MkdirAll(destDir, 0o755); err != nil {
+		return fmt.Errorf("failed to create must-gather dir: %w", err)
+	}
+
+	runCtx, cancel := context.WithTimeout(ctx, mustGatherTimeout)
+	defer cancel()
+
+	log.Printf("Running must-gather (abort after %v)...", mustGatherTimeout)
+	cmd := exec.CommandContext(runCtx, "oc", "adm", "must-gather", "--dest-dir="+destDir)
+	cmd.Env = append(os.Environ(), "KUBECONFIG="+kubeconfigPath)
+
+	out, err := cmd.CombinedOutput()
+	if err != nil {
+		if len(out) > 0 {
+			log.Printf("must-gather stderr/stdout: %s", out)
+		}
+		return fmt.Errorf("must-gather failed: %w", err)
+	}
 	return nil
 }
 
